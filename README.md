@@ -53,7 +53,8 @@ needed. They are read from environment variables at runtime.
 
 > **Note on the phrase list:** `keyterms.json` is sent as the MAI-Transcribe
 > [phrase list](https://learn.microsoft.com/azure/ai-services/speech-service/mai-transcribe)
-> (only MAI-Transcribe models support this). The client sends at most **200** phrases.
+> (only MAI-Transcribe models support this). MAI-Transcribe caps the list at
+> **50** items, so the client sends only the first 50.
 >
 > **Note on data retention:** the synchronous fast-transcription endpoint processes
 > audio in-flight and does **not** store the audio or transcript (unlike batch
@@ -106,8 +107,8 @@ That's it — send the bot a voice message and it replies with the transcription
 ## Editing the phrase list
 
 Edit the `keyterms` array in `keyterms.json` and push to `main`; the workflow
-redeploys automatically. The first 200 entries are sent as the MAI-Transcribe
-phrase list.
+redeploys automatically. The first 50 entries are sent as the MAI-Transcribe
+phrase list (the model's maximum).
 
 ## Run locally (optional)
 
