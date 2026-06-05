@@ -8,14 +8,15 @@ import { fileURLToPath } from 'node:url';
 export function getConfig() {
   const botToken = required('TELEGRAM_BOT_TOKEN');
   const speechKey = required('AZURE_SPEECH_KEY');
-  const speechResource = required('AZURE_SPEECH_RESOURCE');
+  const speechEndpoint = resolveSpeechEndpoint();
 
   return {
     botToken,
     speechKey,
-    // Azure Speech resource name — the "{name}" in
-    // {name}.cognitiveservices.azure.com. Region is implied by the resource.
-    speechResource,
+    // Base origin for the Speech resource, e.g.
+    // "https://myresource.cognitiveservices.azure.com" or the regional
+    // "https://westeurope.api.cognitive.microsoft.com". No trailing slash.
+    speechEndpoint,
     // Optional shared secret that Telegram echoes back in a header so we can
     // verify the request really came from Telegram. Set the same value when
     // registering the webhook.
@@ -39,6 +40,35 @@ function required(name) {
     throw new Error(`Missing required app setting: ${name}`);
   }
   return value;
+}
+
+/**
+ * Resolves the Speech resource base origin (no trailing slash) from app
+ * settings, accepting whatever form the Azure portal hands you:
+ *   - AZURE_SPEECH_ENDPOINT — a full endpoint URL, e.g.
+ *     "https://westeurope.api.cognitive.microsoft.com/" (the portal's
+ *     "Keys and Endpoint" → Endpoint field), or
+ *   - AZURE_SPEECH_RESOURCE — a bare resource name ("myresource") which maps
+ *     to "https://myresource.cognitiveservices.azure.com", or a full host.
+ */
+function resolveSpeechEndpoint() {
+  const endpoint = process.env.AZURE_SPEECH_ENDPOINT;
+  if (endpoint) {
+    return stripTrailingSlash(endpoint.trim());
+  }
+  const resource = process.env.AZURE_SPEECH_RESOURCE;
+  if (resource) {
+    const value = resource.trim();
+    if (/^https?:\/\//i.test(value)) return stripTrailingSlash(value);
+    // A dotted value is treated as a hostname; a bare token as a resource name.
+    const host = value.includes('.') ? value : `${value}.cognitiveservices.azure.com`;
+    return `https://${stripTrailingSlash(host)}`;
+  }
+  throw new Error('Missing required app setting: AZURE_SPEECH_ENDPOINT or AZURE_SPEECH_RESOURCE');
+}
+
+function stripTrailingSlash(s) {
+  return s.replace(/\/+$/, '');
 }
 
 let cachedKeyterms;

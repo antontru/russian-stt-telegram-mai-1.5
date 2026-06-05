@@ -20,8 +20,9 @@ const MAX_PHRASES = 200;
  *
  * @param {object} opts
  * @param {string} opts.apiKey        Speech resource key (Ocp-Apim-Subscription-Key).
- * @param {string} opts.resourceName  Speech resource name (the "{name}" in
- *   {name}.cognitiveservices.azure.com).
+ * @param {string} opts.endpoint      Speech resource base origin, e.g.
+ *   "https://myresource.cognitiveservices.azure.com" or the regional
+ *   "https://westeurope.api.cognitive.microsoft.com" (no trailing slash).
  * @param {Buffer} opts.bytes         Raw media bytes.
  * @param {string} opts.filename      Filename hint (sent as the multipart filename).
  * @param {string} opts.contentType   MIME type of the media.
@@ -35,7 +36,7 @@ const MAX_PHRASES = 200;
  *   and disfluencies).
  * @returns {Promise<{text: string, languageCode?: string}>}
  */
-export async function transcribe({ apiKey, resourceName, bytes, filename, contentType, model, languageCode, keyterms, transcribeStyle }) {
+export async function transcribe({ apiKey, endpoint, bytes, filename, contentType, model, languageCode, keyterms, transcribeStyle }) {
   const definition = {
     // enhancedMode selects the MAI-Transcribe model.
     enhancedMode: { enabled: true, model },
@@ -59,8 +60,7 @@ export async function transcribe({ apiKey, resourceName, bytes, filename, conten
   form.append('definition', JSON.stringify(definition));
 
   const url =
-    `https://${resourceName}.cognitiveservices.azure.com` +
-    `/speechtotext/transcriptions:transcribe?api-version=${API_VERSION}`;
+    `${endpoint}/speechtotext/transcriptions:transcribe?api-version=${API_VERSION}`;
 
   const res = await fetch(url, {
     method: 'POST',

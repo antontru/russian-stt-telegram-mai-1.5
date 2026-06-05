@@ -26,8 +26,9 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 | Setting | Required | Notes |
 |---|---|---|
 | `TELEGRAM_BOT_TOKEN` | ✅ | From [@BotFather](https://t.me/BotFather). |
-| `AZURE_SPEECH_KEY` | ✅ | Key for your Azure AI Speech resource. |
-| `AZURE_SPEECH_RESOURCE` | ✅ | Speech resource **name** — the `{name}` in `{name}.cognitiveservices.azure.com`. |
+| `AZURE_SPEECH_KEY` | ✅ | KEY 1 (or KEY 2) from the resource's *Keys and Endpoint* blade. |
+| `AZURE_SPEECH_ENDPOINT` | ✅* | The **Endpoint** URL from *Keys and Endpoint*, e.g. `https://westeurope.api.cognitive.microsoft.com/`. |
+| `AZURE_SPEECH_RESOURCE` | ✅* | Alternative to `AZURE_SPEECH_ENDPOINT`: the resource **name** (maps to `https://{name}.cognitiveservices.azure.com`). |
 | `ALLOWED_USER_ID` | recommended | Your numeric Telegram user id ([@userinfobot](https://t.me/userinfobot)). Others are ignored. |
 | `TELEGRAM_SECRET_TOKEN` | recommended | Random string; verifies calls really come from Telegram. |
 | `LANGUAGE_CODE` | optional | BCP-47 locale hint (`ru-RU`/`en-US`). Leave empty for auto-detect (best for mixed RU/EN). |
@@ -36,6 +37,13 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 
 All of these are stored as **App Settings** in the Function App — free, no Key Vault
 needed. They are read from environment variables at runtime.
+
+> *Provide **either** `AZURE_SPEECH_ENDPOINT` (full URL — simplest, just paste the
+> portal's Endpoint field) **or** `AZURE_SPEECH_RESOURCE` (bare name). If both are
+> set, `AZURE_SPEECH_ENDPOINT` wins. The fast-transcription API is documented
+> against the custom-subdomain host (`{name}.cognitiveservices.azure.com`); if your
+> regional endpoint returns 404, set `AZURE_SPEECH_RESOURCE` to the resource name
+> instead.
 
 > **Note on the phrase list:** `keyterms.json` is sent as the MAI-Transcribe
 > [phrase list](https://learn.microsoft.com/azure/ai-services/speech-service/mai-transcribe)
@@ -53,7 +61,8 @@ In the [Azure portal](https://portal.azure.com) (or CLI):
 
 1. Create an **Azure AI Speech** resource (from the [AI Foundry](https://ai.azure.com)
    model catalog or the portal) in a region where **MAI-Transcribe-1.5** is available.
-   Copy its **name** (`AZURE_SPEECH_RESOURCE`) and a **key** (`AZURE_SPEECH_KEY`).
+   From its *Keys and Endpoint* blade, copy a **key** (`AZURE_SPEECH_KEY`) and the
+   **Endpoint** URL (`AZURE_SPEECH_ENDPOINT`).
 2. Create a **Function App**:
    - Plan: **Consumption**, OS: **Windows**, Runtime: **Node.js 24 LTS**
    - It will create an associated Storage account automatically.

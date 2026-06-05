@@ -5,7 +5,7 @@
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "TELEGRAM_BOT_TOKEN": "123456:your-bot-token",
     "AZURE_SPEECH_KEY": "your-azure-speech-resource-key",
-    "AZURE_SPEECH_RESOURCE": "your-speech-resource-name",
+    "AZURE_SPEECH_ENDPOINT": "https://westeurope.api.cognitive.microsoft.com/",
     "TELEGRAM_SECRET_TOKEN": "a-long-random-string",
     "ALLOWED_USER_ID": "your-numeric-telegram-user-id",
     "LANGUAGE_CODE": "",

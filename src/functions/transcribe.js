@@ -64,7 +64,7 @@ async function handler(request, context) {
 
     const { text, languageCode } = await transcribe({
       apiKey: config.speechKey,
-      resourceName: config.speechResource,
+      endpoint: config.speechEndpoint,
       bytes,
       filename,
       contentType,
