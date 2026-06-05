@@ -2,6 +2,7 @@ import { app } from '@azure/functions';
 import { getConfig, getKeyterms } from '../config.js';
 import { TelegramClient, extractMedia } from '../telegram.js';
 import { transcribe } from '../azure-speech.js';
+import { ensureSupported } from '../audio.js';
 
 /**
  * Telegram webhook handler. Telegram POSTs an Update object here; we transcribe
@@ -60,21 +61,24 @@ async function handler(request, context) {
   try {
     await telegram.sendChatAction(chatId, 'typing');
 
-    const { bytes, filename, contentType } = await telegram.downloadFile(media.fileId, media.mimeType);
+    const downloaded = await telegram.downloadFile(media.fileId, media.mimeType);
+    // MAI-Transcribe rejects WebM/M4A/MP4/etc.; transcode those to WAV first.
+    const audio = await ensureSupported(downloaded);
 
     const { text, languageCode } = await transcribe({
       apiKey: config.speechKey,
       endpoint: config.speechEndpoint,
-      bytes,
-      filename,
-      contentType,
+      bytes: audio.bytes,
+      filename: audio.filename,
+      contentType: audio.contentType,
       model: config.model,
       languageCode: config.languageCode,
       keyterms: getKeyterms(),
       transcribeStyle: config.transcribeStyle,
     });
 
-    context.log(`Transcribed ${media.kind} (${bytes.length} bytes, lang=${languageCode ?? 'auto'}).`);
+    const note = audio.converted ? `, transcoded ${downloaded.contentType} → wav` : '';
+    context.log(`Transcribed ${media.kind} (${audio.bytes.length} bytes${note}, lang=${languageCode ?? 'auto'}).`);
     await telegram.replyText(chatId, message.message_id, text);
   } catch (err) {
     context.error(`Transcription failed: ${err.message}`);

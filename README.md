@@ -13,14 +13,19 @@ a static **phrase list** to bias recognition toward names/jargon.
 ```
 Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
    →  verify secret + owner  →  download file from Telegram (≤20 MB)
+   →  transcode to WAV if needed (ffmpeg)
    →  POST to Azure Speech fast transcription (MAI-Transcribe-1.5, with phrase list)
    →  reply with transcript
 ```
 
 - **Function code:** `src/functions/transcribe.js` (route: `POST /api/telegram`)
 - **Telegram/Azure Speech helpers:** `src/telegram.js`, `src/azure-speech.js`
+- **Transcoding:** `src/audio.js` (ffmpeg via `ffmpeg-static`)
 - **Phrase list (key terms):** `keyterms.json` (static list, edit + redeploy to change)
-- **Supported formats:** WAV, MP3, OPUS/OGG (Telegram voice), WebM, M4A (Apple Voice Memos), FLAC, AMR, AAC, MP4 (video notes)
+- **Supported formats:** WAV, MP3, FLAC, and OGG/Opus (Telegram voice) go straight to
+  Azure; everything else (WebM, M4A/Apple Voice Memos, MP4 video notes, AMR, AAC, …)
+  is transcoded to 16 kHz mono WAV first, since MAI-Transcribe only accepts
+  WAV/MP3/FLAC/OGG.
 
 ## Configuration (Azure Function App Settings)
 
@@ -35,6 +40,7 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 | `LANGUAGE_CODE` | optional | BCP-47 locale hint (`ru-RU`/`en-US`). Leave empty for auto-detect (best for mixed RU/EN). |
 | `AZURE_SPEECH_MODEL` | optional | Defaults to `mai-transcribe-1.5`. |
 | `AZURE_TRANSCRIBE_STYLE` | optional | Set to `verbatim` to keep fillers/disfluencies. Leave empty for the default cleaned transcript. |
+| `FFMPEG_PATH` | optional | Path to an ffmpeg binary. Defaults to the bundled `ffmpeg-static`; only set this to use a system/custom ffmpeg. |
 
 All of these are stored as **App Settings** in the Function App — free, no Key Vault
 needed. They are read from environment variables at runtime.
@@ -60,6 +66,14 @@ needed. They are read from environment variables at runtime.
 > **Note on data retention:** the synchronous fast-transcription endpoint processes
 > audio in-flight and does **not** store the audio or transcript (unlike batch
 > transcription), so it is effectively zero-retention by default — no flag needed.
+
+> **Note on transcoding / ffmpeg:** the bundled `ffmpeg-static` dependency provides
+> the ffmpeg binary. The deploy workflow (`main_anton-tts.yml`) builds on
+> **windows-latest**, so `npm install` fetches the **Windows** `ffmpeg.exe` and ships
+> it in the deploy. ⚠️ If you instead deploy manually from a **Linux** shell (e.g.
+> Cloud Shell `func azure functionapp publish`), `npm install` there fetches the
+> *Linux* binary, which won't run on the Windows app — push to `main` and let CI
+> build, or set `FFMPEG_PATH` to a Windows ffmpeg on the app.
 
 ## One-time setup
 
