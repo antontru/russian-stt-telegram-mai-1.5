@@ -29,6 +29,7 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 | `TELEGRAM_SECRET_TOKEN` | recommended | Random string; verifies calls really come from Telegram. |
 | `LANGUAGE_CODE` | optional | ISO 639 hint (`rus`/`eng`). Leave empty for auto-detect (best for mixed RU/EN). |
 | `ELEVENLABS_MODEL` | optional | Defaults to `scribe_v2`. |
+| `ELEVENLABS_ENABLE_LOGGING` | optional | Set to `false` to request Zero Retention Mode (**Enterprise/ZRM accounts only** — breaks requests otherwise). Leave unset to use the account default. |
 
 All of these are stored as **App Settings** in the Function App — free, no Key Vault
 needed. They are read from environment variables at runtime.

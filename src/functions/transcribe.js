@@ -70,6 +70,7 @@ async function handler(request, context) {
       model: config.model,
       languageCode: config.languageCode,
       keyterms: getKeyterms(),
+      enableLogging: config.enableLogging,
     });
 
     context.log(`Transcribed ${media.kind} (${bytes.length} bytes, lang=${languageCode ?? 'auto'}).`);

@@ -23,6 +23,13 @@ export function getConfig() {
     // to let Scribe auto-detect, which is best for mixed Russian/English.
     languageCode: process.env.LANGUAGE_CODE || '',
     model: process.env.ELEVENLABS_MODEL || 'scribe_v2',
+    // Controls the ElevenLabs `enable_logging` query param. Set the app setting
+    // to "false" to request Zero Retention Mode (Enterprise/ZRM accounts only).
+    // Set to "true" or leave unset to use the account default. Only "true"/
+    // "false" are forwarded; anything else is ignored.
+    enableLogging: ['true', 'false'].includes(process.env.ELEVENLABS_ENABLE_LOGGING)
+      ? process.env.ELEVENLABS_ENABLE_LOGGING
+      : undefined,
   };
 }
 

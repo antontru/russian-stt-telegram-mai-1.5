@@ -8,6 +8,7 @@
     "TELEGRAM_SECRET_TOKEN": "a-long-random-string",
     "ALLOWED_USER_ID": "your-numeric-telegram-user-id",
     "LANGUAGE_CODE": "",
-    "ELEVENLABS_MODEL": "scribe_v2"
+    "ELEVENLABS_MODEL": "scribe_v2",
+    "ELEVENLABS_ENABLE_LOGGING": ""
   }
 }
