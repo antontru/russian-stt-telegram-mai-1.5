@@ -1,0 +1,17 @@
+{
+  "name": "local-russian-tts",
+  "version": "1.0.0",
+  "description": "Personal Telegram bot that transcribes voice/video/audio messages using the ElevenLabs Scribe v2 API. Runs on an Azure Functions Consumption plan (Windows, Node.js 24).",
+  "main": "src/functions/*.js",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "func start",
+    "set-webhook": "node scripts/set-webhook.js"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.7.0"
+  }
+}

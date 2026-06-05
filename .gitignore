@@ -1,0 +1,8 @@
+node_modules/
+local.settings.json
+.DS_Store
+*.log
+bin/
+obj/
+.python_packages/
+.vscode/

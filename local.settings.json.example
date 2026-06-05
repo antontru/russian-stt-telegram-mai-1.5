@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "TELEGRAM_BOT_TOKEN": "123456:your-bot-token",
+    "ELEVENLABS_API_KEY": "sk_your_elevenlabs_key",
+    "TELEGRAM_SECRET_TOKEN": "a-long-random-string",
+    "ALLOWED_USER_ID": "your-numeric-telegram-user-id",
+    "LANGUAGE_CODE": "",
+    "ELEVENLABS_MODEL": "scribe_v2"
+  }
+}
