@@ -17,6 +17,8 @@ export async function transcribe({ apiKey, bytes, filename, contentType, model, 
   const form = new FormData();
   form.append('file', new Blob([bytes], { type: contentType }), filename);
   form.append('model_id', model);
+  // Don't litter the transcript with (laughter)/(footsteps) style tags.
+  form.append('tag_audio_events', 'false');
   if (languageCode) {
     form.append('language_code', languageCode);
   }
