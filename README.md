@@ -40,7 +40,7 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 | `LANGUAGE_CODE` | optional | BCP-47 locale hint (`ru-RU`/`en-US`). Leave empty for auto-detect (best for mixed RU/EN). |
 | `AZURE_SPEECH_MODEL` | optional | Defaults to `mai-transcribe-1.5`. |
 | `AZURE_TRANSCRIBE_STYLE` | optional | Set to `verbatim` to keep fillers/disfluencies. Leave empty for the default cleaned transcript. |
-| `FFMPEG_PATH` | optional | Path to an ffmpeg binary. Defaults to the bundled `ffmpeg-static`; only set this to use a system/custom ffmpeg. |
+| `FFMPEG_PATH` | optional | Explicit path to an ffmpeg binary. Resolution order: `FFMPEG_PATH` → bundled `./bin/ffmpeg(.exe)` → `ffmpeg-static` → `ffmpeg` on PATH. |
 
 All of these are stored as **App Settings** in the Function App — free, no Key Vault
 needed. They are read from environment variables at runtime.
@@ -67,13 +67,12 @@ needed. They are read from environment variables at runtime.
 > audio in-flight and does **not** store the audio or transcript (unlike batch
 > transcription), so it is effectively zero-retention by default — no flag needed.
 
-> **Note on transcoding / ffmpeg:** the bundled `ffmpeg-static` dependency provides
-> the ffmpeg binary. The deploy workflow (`main_anton-tts.yml`) builds on
-> **windows-latest**, so `npm install` fetches the **Windows** `ffmpeg.exe` and ships
-> it in the deploy. ⚠️ If you instead deploy manually from a **Linux** shell (e.g.
-> Cloud Shell `func azure functionapp publish`), `npm install` there fetches the
-> *Linux* binary, which won't run on the Windows app — push to `main` and let CI
-> build, or set `FFMPEG_PATH` to a Windows ffmpeg on the app.
+> **Note on transcoding / ffmpeg:** WebM/M4A/MP4 are transcoded to WAV with ffmpeg.
+> Because we deploy manually from Linux (Cloud Shell) to a **Windows** app, the
+> `ffmpeg-static` Linux binary won't run there — so run `npm run fetch-ffmpeg`
+> before deploying to drop a **Windows** `ffmpeg.exe` into `./bin`, which ships in
+> the package (`src/audio.js` prefers `./bin`, then `FFMPEG_PATH`, then
+> `ffmpeg-static`). See *Deploy* below.
 
 ## One-time setup
 
@@ -93,16 +92,30 @@ In the [Azure portal](https://portal.azure.com) (or CLI):
 Then add the App Settings from the table above (Function App → *Settings →
 Environment variables*).
 
-### 2. Configure CI/CD deploy (GitHub Actions)
+### 2. Deploy (manual, from Azure Cloud Shell)
 
-The workflow `.github/workflows/deploy.yml` deploys on every push to `main`.
+We deploy by hand with the Azure Functions Core Tools — no GitHub Actions needed.
+From [Azure Cloud Shell](https://shell.azure.com) (already authenticated):
 
-1. In the Function App, download the **publish profile**
-   (*Overview → Get publish profile*).
-2. In GitHub → *Settings → Secrets and variables → Actions*:
-   - Add a **secret** `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` = the publish profile XML.
-   - Add a **variable** `AZURE_FUNCTIONAPP_NAME` = your Function App name.
-3. Push to `main` (or run the workflow manually via *Actions → Run workflow*).
+```bash
+git clone https://github.com/antontru/local-russian-tts.git
+cd local-russian-tts
+npm ci --omit=dev
+npm run fetch-ffmpeg        # downloads a Windows ffmpeg.exe into ./bin
+func azure functionapp publish anton-tts --javascript
+```
+
+- `fetch-ffmpeg` is required because the app runs on **Windows** but Cloud Shell is
+  Linux; it bundles the correct `ffmpeg.exe` (needs `unzip`, preinstalled in Cloud
+  Shell). Re-run it only when you want to refresh ffmpeg.
+- `--javascript` is needed in a fresh clone (the runtime hint lives in the
+  gitignored `local.settings.json`).
+- App-setting changes (keys, endpoint, keyterms) take effect without a redeploy;
+  code/keyterms changes require re-running `func ... publish`.
+
+> A `main_anton-tts.yml` GitHub Actions workflow also exists (from Azure Deployment
+> Center) but is **not used** — GitHub Actions is blocked on this account. Ignore or
+> delete it.
 
 ### 3. Register the Telegram webhook
 
