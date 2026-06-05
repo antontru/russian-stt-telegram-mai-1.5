@@ -1,7 +1,7 @@
 import { app } from '@azure/functions';
 import { getConfig, getKeyterms } from '../config.js';
 import { TelegramClient, extractMedia } from '../telegram.js';
-import { transcribe } from '../elevenlabs.js';
+import { transcribe } from '../azure-speech.js';
 
 /**
  * Telegram webhook handler. Telegram POSTs an Update object here; we transcribe
@@ -63,14 +63,15 @@ async function handler(request, context) {
     const { bytes, filename, contentType } = await telegram.downloadFile(media.fileId, media.mimeType);
 
     const { text, languageCode } = await transcribe({
-      apiKey: config.elevenLabsApiKey,
+      apiKey: config.speechKey,
+      endpoint: config.speechEndpoint,
       bytes,
       filename,
       contentType,
       model: config.model,
       languageCode: config.languageCode,
       keyterms: getKeyterms(),
-      enableLogging: config.enableLogging,
+      transcribeStyle: config.transcribeStyle,
     });
 
     context.log(`Transcribed ${media.kind} (${bytes.length} bytes, lang=${languageCode ?? 'auto'}).`);

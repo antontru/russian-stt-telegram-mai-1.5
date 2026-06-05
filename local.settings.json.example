@@ -4,11 +4,12 @@
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "TELEGRAM_BOT_TOKEN": "123456:your-bot-token",
-    "ELEVENLABS_API_KEY": "sk_your_elevenlabs_key",
+    "AZURE_SPEECH_KEY": "your-azure-speech-resource-key",
+    "AZURE_SPEECH_ENDPOINT": "https://westeurope.api.cognitive.microsoft.com/",
     "TELEGRAM_SECRET_TOKEN": "a-long-random-string",
     "ALLOWED_USER_ID": "your-numeric-telegram-user-id",
     "LANGUAGE_CODE": "",
-    "ELEVENLABS_MODEL": "scribe_v2",
-    "ELEVENLABS_ENABLE_LOGGING": ""
+    "AZURE_SPEECH_MODEL": "mai-transcribe-1.5",
+    "AZURE_TRANSCRIBE_STYLE": ""
   }
 }
