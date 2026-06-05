@@ -24,6 +24,8 @@ export async function transcribe({ apiKey, bytes, filename, contentType, model, 
   for (const term of keyterms || []) {
     form.append('keyterms', term);
   }
+  // Deliberately NOT setting `entity_detection` (opt-in, +30% surcharge) or
+  // `diarize`. Plain transcription is all this bot needs.
 
   const res = await fetch(STT_ENDPOINT, {
     method: 'POST',
