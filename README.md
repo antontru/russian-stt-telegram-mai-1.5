@@ -20,6 +20,7 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 - **Function code:** `src/functions/transcribe.js` (route: `POST /api/telegram`)
 - **Telegram/Azure Speech helpers:** `src/telegram.js`, `src/azure-speech.js`
 - **Phrase list (key terms):** `keyterms.json` (static list, edit + redeploy to change)
+- **Supported formats:** WAV, MP3, OPUS/OGG (Telegram voice), WebM, M4A (Apple Voice Memos), FLAC, AMR, AAC, MP4 (video notes)
 
 ## Configuration (Azure Function App Settings)
 

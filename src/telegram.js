@@ -88,9 +88,64 @@ export class TelegramClient {
     }
     const bytes = Buffer.from(await res.arrayBuffer());
     const filename = file.file_path.split('/').pop() || 'audio';
-    const contentType = res.headers.get('content-type') || fallbackMime || 'application/octet-stream';
+    // Telegram's file CDN often serves audio as application/octet-stream, which
+    // the recognizer can't sniff. Prefer a concrete type: a meaningful response
+    // header, else infer from the file extension, else the caller's hint.
+    const headerType = stripParams(res.headers.get('content-type'));
+    const contentType = normalizeMime(
+      (headerType && headerType !== 'application/octet-stream' && headerType) ||
+      mimeFromExtension(filename) ||
+      stripParams(fallbackMime) ||
+      'application/octet-stream',
+    );
     return { bytes, filename, contentType };
   }
+}
+
+// Extension → MIME map for the audio/video containers Azure Speech accepts
+// (WAV, MP3, OPUS/OGG, FLAC, AMR, WebM, M4A). Telegram uses .oga for voice.
+const EXT_MIME = {
+  webm: 'audio/webm',
+  ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+  opus: 'audio/ogg',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  m4b: 'audio/mp4',
+  mp4: 'video/mp4',
+  wav: 'audio/wav',
+  flac: 'audio/flac',
+  amr: 'audio/amr',
+  aac: 'audio/aac',
+};
+
+// Canonicalize the non-standard MIME types that Apple/Telegram emit for the
+// same container. Apple Voice Memos (.m4a) are AAC in an MP4 container but are
+// commonly labelled audio/x-m4a or audio/m4a.
+const MIME_ALIASES = {
+  'audio/x-m4a': 'audio/mp4',
+  'audio/m4a': 'audio/mp4',
+  'audio/mp4a-latm': 'audio/mp4',
+  'audio/x-wav': 'audio/wav',
+  'audio/vnd.wave': 'audio/wav',
+  'audio/wave': 'audio/wav',
+  'audio/x-flac': 'audio/flac',
+  'audio/opus': 'audio/ogg',
+  'audio/x-mpeg': 'audio/mpeg',
+};
+
+function mimeFromExtension(filename) {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  return ext ? EXT_MIME[ext] : undefined;
+}
+
+function normalizeMime(type) {
+  return MIME_ALIASES[type.toLowerCase()] || type;
+}
+
+// Drops any "; charset=..."-style parameters and surrounding whitespace.
+function stripParams(type) {
+  return type ? type.split(';')[0].trim() : type;
 }
 
 function splitText(text, max) {
