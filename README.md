@@ -45,9 +45,16 @@ needed. They are read from environment variables at runtime.
 > regional endpoint returns 404, set `AZURE_SPEECH_RESOURCE` to the resource name
 > instead.
 
+> **⚠️ Region:** MAI-Transcribe-1.5 (enhanced mode) is only available in
+> **East US**, **North Europe**, **West US**, and **Southeast Asia**. Create the
+> Speech resource in one of these — other regions return
+> `HTTP 400 "Enhanced mode with model is currently not supported yet."`
+> ([region list](https://learn.microsoft.com/azure/ai-services/speech-service/regions?tabs=llmspeech)).
+
 > **Note on the phrase list:** `keyterms.json` is sent as the MAI-Transcribe
 > [phrase list](https://learn.microsoft.com/azure/ai-services/speech-service/mai-transcribe)
-> (only MAI-Transcribe models support this). The client sends at most **200** phrases.
+> (only MAI-Transcribe models support this). MAI-Transcribe caps the list at
+> **50** items, so the client sends only the first 50.
 >
 > **Note on data retention:** the synchronous fast-transcription endpoint processes
 > audio in-flight and does **not** store the audio or transcript (unlike batch
@@ -60,9 +67,10 @@ needed. They are read from environment variables at runtime.
 In the [Azure portal](https://portal.azure.com) (or CLI):
 
 1. Create an **Azure AI Speech** resource (from the [AI Foundry](https://ai.azure.com)
-   model catalog or the portal) in a region where **MAI-Transcribe-1.5** is available.
-   From its *Keys and Endpoint* blade, copy a **key** (`AZURE_SPEECH_KEY`) and the
-   **Endpoint** URL (`AZURE_SPEECH_ENDPOINT`).
+   model catalog or the portal) in a region where **MAI-Transcribe-1.5** is available
+   — **East US**, **North Europe**, **West US**, or **Southeast Asia**. From its
+   *Keys and Endpoint* blade, copy a **key** (`AZURE_SPEECH_KEY`) and the **Endpoint**
+   URL (`AZURE_SPEECH_ENDPOINT`).
 2. Create a **Function App**:
    - Plan: **Consumption**, OS: **Windows**, Runtime: **Node.js 24 LTS**
    - It will create an associated Storage account automatically.
@@ -99,8 +107,8 @@ That's it — send the bot a voice message and it replies with the transcription
 ## Editing the phrase list
 
 Edit the `keyterms` array in `keyterms.json` and push to `main`; the workflow
-redeploys automatically. The first 200 entries are sent as the MAI-Transcribe
-phrase list.
+redeploys automatically. The first 50 entries are sent as the MAI-Transcribe
+phrase list (the model's maximum).
 
 ## Run locally (optional)
 

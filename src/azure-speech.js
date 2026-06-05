@@ -6,8 +6,9 @@
 
 const API_VERSION = '2025-10-15';
 
-// Azure's phrase list caps the number of phrases; stay comfortably under it.
-const MAX_PHRASES = 200;
+// MAI-Transcribe caps the phrase list ("context list") at 50 items; extra
+// phrases trigger HTTP 400 "Context list cannot have more than 50 items."
+const MAX_PHRASES = 50;
 
 /**
  * Transcribes an audio/video buffer with the Azure Speech fast transcription
