@@ -14,6 +14,7 @@ import { writeFile, unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import ffmpegStatic from 'ffmpeg-static';
 
@@ -88,6 +89,14 @@ function runFfmpeg(args) {
 function resolveFfmpeg() {
   const override = process.env.FFMPEG_PATH;
   if (override && existsSync(override)) return override;
+  // A binary bundled at ./bin (e.g. a Windows ffmpeg.exe fetched before a
+  // manual deploy) wins over ffmpeg-static, which holds a wrong-platform
+  // binary when the app is built on a different OS than it runs on (Linux
+  // Cloud Shell build → Windows Function App).
+  for (const name of ['ffmpeg.exe', 'ffmpeg']) {
+    const bundled = fileURLToPath(new URL(`../bin/${name}`, import.meta.url));
+    if (existsSync(bundled)) return bundled;
+  }
   if (ffmpegStatic && existsSync(ffmpegStatic)) return ffmpegStatic;
   // Last resort: rely on ffmpeg being on PATH.
   return process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
