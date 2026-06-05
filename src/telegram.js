@@ -88,9 +88,38 @@ export class TelegramClient {
     }
     const bytes = Buffer.from(await res.arrayBuffer());
     const filename = file.file_path.split('/').pop() || 'audio';
-    const contentType = res.headers.get('content-type') || fallbackMime || 'application/octet-stream';
+    // Telegram's file CDN often serves audio as application/octet-stream, which
+    // the recognizer can't sniff. Prefer a concrete type: a meaningful response
+    // header, else infer from the file extension, else the caller's hint.
+    const headerType = res.headers.get('content-type');
+    const contentType =
+      (headerType && headerType !== 'application/octet-stream' && headerType) ||
+      mimeFromExtension(filename) ||
+      fallbackMime ||
+      'application/octet-stream';
     return { bytes, filename, contentType };
   }
+}
+
+// Extension → MIME map for the audio/video containers Azure Speech accepts
+// (WAV, MP3, OPUS/OGG, FLAC, AMR, WebM, M4A). Telegram uses .oga for voice.
+const EXT_MIME = {
+  webm: 'audio/webm',
+  ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+  opus: 'audio/ogg',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  mp4: 'video/mp4',
+  wav: 'audio/wav',
+  flac: 'audio/flac',
+  amr: 'audio/amr',
+  aac: 'audio/aac',
+};
+
+function mimeFromExtension(filename) {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  return ext ? EXT_MIME[ext] : undefined;
 }
 
 function splitText(text, max) {
