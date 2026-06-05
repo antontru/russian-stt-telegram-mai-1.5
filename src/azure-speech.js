@@ -30,13 +30,21 @@ const MAX_PHRASES = 200;
  *   Omit to let the service auto-detect (best for mixed Russian/English).
  * @param {string[]} [opts.keyterms]   Phrases to bias recognition toward
  *   (MAI-Transcribe phrase list). Only honored by MAI-Transcribe models.
+ * @param {string} [opts.transcribeStyle] Optional MAI-Transcribe style, e.g.
+ *   "verbatim". Omit for the default cleaned/formatted output (drops fillers
+ *   and disfluencies).
  * @returns {Promise<{text: string, languageCode?: string}>}
  */
-export async function transcribe({ apiKey, resourceName, bytes, filename, contentType, model, languageCode, keyterms }) {
+export async function transcribe({ apiKey, resourceName, bytes, filename, contentType, model, languageCode, keyterms, transcribeStyle }) {
   const definition = {
     // enhancedMode selects the MAI-Transcribe model.
     enhancedMode: { enabled: true, model },
   };
+  if (transcribeStyle) {
+    // e.g. "verbatim" to keep fillers/disfluencies. Omitting it yields the
+    // default cleaned transcript.
+    definition.enhancedMode.transcribeStyle = transcribeStyle;
+  }
   if (languageCode) {
     // Force a single locale. Without this the service auto-detects.
     definition.locales = [languageCode];

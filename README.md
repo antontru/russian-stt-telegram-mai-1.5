@@ -32,6 +32,7 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 | `TELEGRAM_SECRET_TOKEN` | recommended | Random string; verifies calls really come from Telegram. |
 | `LANGUAGE_CODE` | optional | BCP-47 locale hint (`ru-RU`/`en-US`). Leave empty for auto-detect (best for mixed RU/EN). |
 | `AZURE_SPEECH_MODEL` | optional | Defaults to `mai-transcribe-1.5`. |
+| `AZURE_TRANSCRIBE_STYLE` | optional | Set to `verbatim` to keep fillers/disfluencies. Leave empty for the default cleaned transcript. |
 
 All of these are stored as **App Settings** in the Function App — free, no Key Vault
 needed. They are read from environment variables at runtime.

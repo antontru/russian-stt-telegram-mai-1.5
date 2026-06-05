@@ -71,6 +71,7 @@ async function handler(request, context) {
       model: config.model,
       languageCode: config.languageCode,
       keyterms: getKeyterms(),
+      transcribeStyle: config.transcribeStyle,
     });
 
     context.log(`Transcribed ${media.kind} (${bytes.length} bytes, lang=${languageCode ?? 'auto'}).`);

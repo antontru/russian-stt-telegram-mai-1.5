@@ -9,6 +9,7 @@
     "TELEGRAM_SECRET_TOKEN": "a-long-random-string",
     "ALLOWED_USER_ID": "your-numeric-telegram-user-id",
     "LANGUAGE_CODE": "",
-    "AZURE_SPEECH_MODEL": "mai-transcribe-1.5"
+    "AZURE_SPEECH_MODEL": "mai-transcribe-1.5",
+    "AZURE_TRANSCRIBE_STYLE": ""
   }
 }

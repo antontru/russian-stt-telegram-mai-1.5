@@ -27,6 +27,9 @@ export function getConfig() {
     // the service auto-detect, which is best for mixed Russian/English.
     languageCode: process.env.LANGUAGE_CODE || '',
     model: process.env.AZURE_SPEECH_MODEL || 'mai-transcribe-1.5',
+    // Optional MAI-Transcribe style. Set to "verbatim" to keep fillers and
+    // disfluencies. Leave unset for the default cleaned/formatted transcript.
+    transcribeStyle: process.env.AZURE_TRANSCRIBE_STYLE || '',
   };
 }
 
