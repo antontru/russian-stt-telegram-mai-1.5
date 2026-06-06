@@ -15,6 +15,7 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
    →  verify secret + owner  →  download file from Telegram (≤20 MB)
    →  transcode to WAV if needed (ffmpeg)
    →  POST to Azure Speech fast transcription (MAI-Transcribe-1.5, with phrase list)
+   →  (optional) clean transcript with a Foundry chat model (Phi-4)
    →  reply with transcript
 ```
 
@@ -41,6 +42,9 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 | `AZURE_SPEECH_MODEL` | optional | Defaults to `mai-transcribe-1.5`. |
 | `AZURE_TRANSCRIBE_STYLE` | optional | Set to `verbatim` to keep fillers/disfluencies. Leave empty for the default cleaned transcript. |
 | `FFMPEG_PATH` | optional | Explicit path to an ffmpeg binary. Resolution order: `FFMPEG_PATH` → bundled `./bin/ffmpeg(.exe)` → `ffmpeg-static` → `ffmpeg` on PATH. |
+| `AZURE_FOUNDRY_ENDPOINT` | optional | Azure Foundry resource base, e.g. `https://russian-tts-resource.openai.azure.com`. Enables transcript cleanup (with `AZURE_FOUNDRY_KEY`). |
+| `AZURE_FOUNDRY_KEY` | optional | API key for the Foundry resource (sent as a Bearer token). |
+| `AZURE_FOUNDRY_MODEL` | optional | Cleanup model/deployment name. Defaults to `Phi-4`. |
 
 All of these are stored as **App Settings** in the Function App — free, no Key Vault
 needed. They are read from environment variables at runtime.
@@ -66,6 +70,12 @@ needed. They are read from environment variables at runtime.
 > **Note on data retention:** the synchronous fast-transcription endpoint processes
 > audio in-flight and does **not** store the audio or transcript (unlike batch
 > transcription), so it is effectively zero-retention by default — no flag needed.
+
+> **Note on transcript cleanup:** when `AZURE_FOUNDRY_ENDPOINT` and
+> `AZURE_FOUNDRY_KEY` are set, the raw transcript is sent to a Foundry chat model
+> (default **Phi-4**) that strips fillers/hesitations/false starts while preserving
+> language, meaning, names, and terminology — and only the cleaned text is sent to
+> Telegram. If cleanup is unconfigured or fails, the raw transcript is sent instead.
 
 > **Note on transcoding / ffmpeg:** WebM/M4A/MP4 are transcoded to WAV with ffmpeg.
 > Because we deploy manually from Linux (Cloud Shell) to a **Windows** app, the

@@ -3,6 +3,7 @@ import { getConfig, getKeyterms } from '../config.js';
 import { TelegramClient, extractMedia } from '../telegram.js';
 import { transcribe } from '../azure-speech.js';
 import { ensureSupported } from '../audio.js';
+import { cleanTranscript } from '../cleanup.js';
 
 /**
  * Telegram webhook handler. Telegram POSTs an Update object here; we transcribe
@@ -79,7 +80,26 @@ async function handler(request, context) {
 
     const note = audio.converted ? `, transcoded ${downloaded.contentType} → wav` : '';
     context.log(`Transcribed ${media.kind} (${audio.bytes.length} bytes${note}, lang=${languageCode ?? 'auto'}).`);
-    await telegram.replyText(chatId, message.message_id, text);
+
+    // Optional cleanup pass: strip fillers/disfluencies via the Foundry model.
+    // On any failure, fall back to the raw transcript so the user still gets text.
+    let finalText = text;
+    const { endpoint: cleanupEndpoint, apiKey: cleanupKey, model: cleanupModel } = config.cleanup;
+    if (cleanupEndpoint && cleanupKey && text.trim()) {
+      try {
+        finalText = await cleanTranscript({
+          endpoint: cleanupEndpoint,
+          apiKey: cleanupKey,
+          model: cleanupModel,
+          text,
+        });
+        context.log('Transcript cleaned via Foundry post-processing.');
+      } catch (err) {
+        context.warn(`Cleanup failed, sending raw transcript: ${err.message}`);
+      }
+    }
+
+    await telegram.replyText(chatId, message.message_id, finalText);
   } catch (err) {
     context.error(`Transcription failed: ${err.message}`);
     await safeReply(telegram, chatId, message.message_id, `⚠️ Transcription failed: ${err.message}`);
