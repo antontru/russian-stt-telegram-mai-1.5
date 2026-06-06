@@ -31,6 +31,13 @@ export function getConfig() {
     // Optional MAI-Transcribe style. Set to "verbatim" to keep fillers and
     // disfluencies. Leave unset for the default cleaned/formatted transcript.
     transcribeStyle: process.env.AZURE_TRANSCRIBE_STYLE || '',
+    // Optional transcript post-processing with a chat model on Azure Foundry.
+    // Cleanup runs only when both endpoint and key are set.
+    cleanup: {
+      endpoint: stripTrailingSlash((process.env.AZURE_FOUNDRY_ENDPOINT || '').trim()),
+      apiKey: process.env.AZURE_FOUNDRY_KEY || '',
+      model: process.env.AZURE_FOUNDRY_MODEL || 'Phi-4',
+    },
   };
 }
 

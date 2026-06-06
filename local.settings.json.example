@@ -10,6 +10,9 @@
     "ALLOWED_USER_ID": "your-numeric-telegram-user-id",
     "LANGUAGE_CODE": "",
     "AZURE_SPEECH_MODEL": "mai-transcribe-1.5",
-    "AZURE_TRANSCRIBE_STYLE": ""
+    "AZURE_TRANSCRIBE_STYLE": "",
+    "AZURE_FOUNDRY_ENDPOINT": "https://russian-tts-resource.openai.azure.com",
+    "AZURE_FOUNDRY_KEY": "your-azure-foundry-key",
+    "AZURE_FOUNDRY_MODEL": "Phi-4"
   }
 }
