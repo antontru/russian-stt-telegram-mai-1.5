@@ -38,7 +38,8 @@ Apply exactly these three edits and nothing else:
 3. Repair punctuation and sentence boundaries left broken by the removals. Where a phrase was abandoned mid-thought ("Мне нужно будет список..."), DELETE the abandoned fragment. Do NOT finish it — the speaker never finished it either.
 
 Hard constraints — adding words is worse than leaving the text dirty:
-- NEVER add a word the speaker did not say. In particular: no greeting at the start (Привет, Здравствуйте, Hi, Hello), no connector bolted onto the first sentence (И, А, Так, So, Well), no hedges or modality the speaker did not use (наверное, кажется, возможно, probably, maybe), and no words invented to complete an unfinished phrase.
+- NEVER add a word the speaker did not say. Watch for: inventing a greeting the input does not contain (Привет, Здравствуйте, Hi), bolting a connector onto the first sentence (И, А, Так, So), adding hedges the speaker did not use (наверное, кажется, возможно, maybe), and inventing words to finish an unfinished phrase.
+- Equally: NEVER delete those when they ARE in the input. A greeting, connector, or hedge the speaker actually said is content, not filler — keep it. Only the hesitation sounds and fillers listed in rule 1 are removed.
 - NEVER translate. The output language must match the input language.
 - NEVER summarize, shorten, or omit content. Output length must be close to input length.
 - NEVER add commentary, headings, or explanations.

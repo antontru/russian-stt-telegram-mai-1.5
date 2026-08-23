@@ -113,14 +113,18 @@ needed. They are read from environment variables at runtime.
 > "clean" sometimes summarizes instead — is **rejected**, and the raw transcript
 > is sent instead of a silently mangled one.
 >
-> **Insertions are the dangerous failure mode.** Phi-4 will happily prepend a
-> greeting you never said, or slip in a hedge like `наверное` that changes your
-> meaning while reading as authentic. The prompt forbids this, but a small model
-> doesn't reliably comply, so two code-level guards run on every response:
+> **Insertions are the dangerous failure mode.** A hedge like `наверное` that
+> the speaker never used changes the meaning while still reading as authentic.
+> The prompt forbids adding words (and, symmetrically, forbids deleting a
+> greeting or hedge that *is* in the input — those are content, not filler), but
+> a small model doesn't reliably comply, so two code-level guards run on every
+> response. **Both compare against the raw transcript from the same run**, never
+> against an earlier one — two runs of the same audio differ on their own, so
+> only the same-run baseline can attribute a word to the cleanup model:
 >
 > - A prepended greeting or connector (`Привет`, `И`, `So`, …) is **stripped**,
->   but only when the source didn't start that way — deterministic, so it's
->   repaired rather than thrown away.
+>   but only when the raw transcript didn't start that way. A greeting the
+>   speaker actually said is kept. Deterministic, so it's repaired not rejected.
 > - Any **Cyrillic** word the model added that has no near-match in the source
 >   (edit distance ≤ 3, which lets through the spelling corrections we asked for,
 >   like `запровиженить` → `запровижинить`) causes the chunk to be **rejected**.
