@@ -3,6 +3,11 @@ const API_BASE = 'https://api.telegram.org';
 // Telegram caps a single text message at 4096 characters.
 const MAX_MESSAGE_LENGTH = 4096;
 
+// Without these a stalled connection would hang the Function until the host's
+// own HTTP timeout (230s on Consumption) kills the whole invocation.
+const API_TIMEOUT_MS = 30_000;
+const DOWNLOAD_TIMEOUT_MS = 120_000;
+
 /**
  * Extracts the transcribable media (if any) from a Telegram message.
  * Handles voice bubbles, video notes (round messages), audio files, and
@@ -42,6 +47,7 @@ export class TelegramClient {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
     const data = await res.json();
     if (!data.ok) {
@@ -82,7 +88,7 @@ export class TelegramClient {
       throw new Error('Telegram returned no file_path (file may exceed the 20 MB Bot API limit).');
     }
     const url = `${API_BASE}/file/bot${this.botToken}/${file.file_path}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
     if (!res.ok) {
       throw new Error(`Failed to download file: HTTP ${res.status}`);
     }

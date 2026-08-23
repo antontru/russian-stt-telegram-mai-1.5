@@ -19,6 +19,13 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
    →  reply with transcript
 ```
 
+> **What MAI-Transcribe can't do:** diarization, channel (stereo) separation,
+> translation, and prompt-tuning are all unsupported. Those need the non-MAI
+> **LLM Speech enhanced** model — which, notably, *does* accept a `prompt`, so it
+> could be told "don't transliterate English technical terms into Cyrillic"
+> directly at recognition time instead of repairing it downstream. Worth an A/B
+> if the cleanup pass ever stops being enough.
+
 - **Function code:** `src/functions/transcribe.js` (route: `POST /api/telegram`)
 - **Telegram/Azure Speech helpers:** `src/telegram.js`, `src/azure-speech.js`
 - **Transcoding:** `src/audio.js` (ffmpeg via `ffmpeg-static`)
@@ -38,13 +45,17 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 | `AZURE_SPEECH_RESOURCE` | ✅* | Alternative to `AZURE_SPEECH_ENDPOINT`: the resource **name** (maps to `https://{name}.cognitiveservices.azure.com`). |
 | `ALLOWED_USER_ID` | recommended | Your numeric Telegram user id ([@userinfobot](https://t.me/userinfobot)). Others are ignored. |
 | `TELEGRAM_SECRET_TOKEN` | recommended | Random string; verifies calls really come from Telegram. |
-| `LANGUAGE_CODE` | optional | BCP-47 locale hint (`ru-RU`/`en-US`). Leave empty for auto-detect (best for mixed RU/EN). |
-| `AZURE_SPEECH_MODEL` | optional | Defaults to `mai-transcribe-1.5`. |
-| `AZURE_TRANSCRIBE_STYLE` | optional | Set to `verbatim` to keep fillers/disfluencies. Leave empty for the default cleaned transcript. |
+| `LANGUAGE_CODE` | optional | Locale hint. MAI-Transcribe's docs use bare codes (`ru`, `en`); BCP-47 (`ru-RU`) also works. **Leave empty for auto-detect — best for mixed RU/EN.** |
+| `AZURE_SPEECH_MODEL` | optional | Defaults to `mai-transcribe-1.5`, the only live model (`mai-transcribe-1` was deprecated 2026-08-20). |
+| `AZURE_TRANSCRIBE_STYLE` | optional | Set to `verbatim` to keep fillers/disfluencies. **Leave empty** for the default readability-optimized transcript. Any other value is ignored rather than sent, so a typo can't silently degrade every transcript. |
+| `AZURE_PHRASE_LIST_MAX` | optional | Phrase-list size sent to MAI-Transcribe. Defaults to `50`; run `npm run probe-phrase-limit` to find your resource's real ceiling. |
 | `FFMPEG_PATH` | optional | Explicit path to an ffmpeg binary. Resolution order: `FFMPEG_PATH` → bundled `./bin/ffmpeg(.exe)` → `ffmpeg-static` → `ffmpeg` on PATH. |
 | `AZURE_FOUNDRY_ENDPOINT` | optional | Azure Foundry resource base, e.g. `https://<your-foundry-resource>.openai.azure.com`. Enables transcript cleanup (with `AZURE_FOUNDRY_KEY`). |
 | `AZURE_FOUNDRY_KEY` | optional | API key for the Foundry resource (sent as a Bearer token). |
 | `AZURE_FOUNDRY_MODEL` | optional | Cleanup model/deployment name. Defaults to `Phi-4`. |
+
+> **⚠️ Preview:** MAI-Transcribe is still in **public preview** — no SLA, and
+> behavior can change without notice.
 
 All of these are stored as **App Settings** in the Function App — free, no Key Vault
 needed. They are read from environment variables at runtime.
@@ -62,10 +73,19 @@ needed. They are read from environment variables at runtime.
 > `HTTP 400 "Enhanced mode with model is currently not supported yet."`
 > ([region list](https://learn.microsoft.com/azure/ai-services/speech-service/regions?tabs=llmspeech)).
 
-> **Note on the phrase list:** `keyterms.json` is sent as the MAI-Transcribe
+> **Note on the phrase list:** `keyterms.json` does double duty. Its first
+> `AZURE_PHRASE_LIST_MAX` entries (default **50**) are sent as the MAI-Transcribe
 > [phrase list](https://learn.microsoft.com/azure/ai-services/speech-service/mai-transcribe)
-> (only MAI-Transcribe models support this). MAI-Transcribe caps the list at
-> **50** items, so the client sends only the first 50.
+> (only MAI-Transcribe models support this); the **whole** file is handed to the
+> cleanup model as a spelling glossary, so terms past the cap still get their
+> canonical Latin-script form enforced. Put the terms the recognizer actually
+> gets wrong at the top.
+>
+> The 50 cap comes from a real `HTTP 400 "Context list cannot have more than 50
+> items."` against `mai-transcribe-1`; Microsoft's Foundry notebook for
+> `mai-transcribe-1.5` now documents up to **200**. Run
+> `npm run probe-phrase-limit` against your own resource to find the true
+> ceiling, then raise `AZURE_PHRASE_LIST_MAX`.
 >
 > **Note on data retention:** the synchronous fast-transcription endpoint processes
 > audio in-flight and does **not** store the audio or transcript (unlike batch
@@ -73,9 +93,29 @@ needed. They are read from environment variables at runtime.
 
 > **Note on transcript cleanup:** when `AZURE_FOUNDRY_ENDPOINT` and
 > `AZURE_FOUNDRY_KEY` are set, the raw transcript is sent to a Foundry chat model
-> (default **Phi-4**) that strips fillers/hesitations/false starts while preserving
-> language, meaning, names, and terminology — and only the cleaned text is sent to
-> Telegram. If cleanup is unconfigured or fails, the raw transcript is sent instead.
+> (default **Phi-4**), and only the cleaned text is sent to Telegram. It does two
+> jobs:
+>
+> 1. Strips fillers, hesitations, and false starts.
+> 2. **Restores English technical terms that MAI-Transcribe transliterated into
+>    Cyrillic** — `Азжур` → `Azure`, `Тенант` → `tenant`, `Шерпоинт` →
+>    `SharePoint`. The phrase list *cannot* fix these: the recognizer already
+>    understood the word and then declined it into a Russian case, so there was
+>    no Latin-script form it could have emitted. It has to be repaired
+>    downstream. (Russian verbs derived from English — `запровижинить`,
+>    `задеплоить` — are deliberately left in Cyrillic; only their spelling is
+>    fixed.)
+>
+> Long transcripts are chunked at sentence boundaries so nothing overruns the
+> model's context or output budget. A response that comes back truncated
+> (`finish_reason: "length"`) or suspiciously short — a small model asked to
+> "clean" sometimes summarizes instead — is **rejected**, and the raw transcript
+> is sent instead of a silently mangled one.
+>
+> Because that fallback is invisible from the chat side, every invocation logs
+> its outcome: `Cleanup: ok via Phi-4 (1240 → 1080 chars)`, `Cleanup: skipped
+> (...)`, or `Cleanup: FAILED via Phi-4, ... — <reason>` at **error** level.
+> Check Application Insights if transcripts suddenly look uncleaned.
 
 > **Note on transcoding / ffmpeg:** WebM/M4A/MP4 are transcoded to WAV with ffmpeg.
 > Because we deploy manually from Linux (Cloud Shell) to a **Windows** app, the
@@ -102,14 +142,21 @@ In the [Azure portal](https://portal.azure.com) (or CLI):
 Then add the App Settings from the table above (Function App → *Settings →
 Environment variables*).
 
-### 2. Deploy (manual, from Azure Cloud Shell)
+### 2. Deploy
 
-We deploy by hand with the Azure Functions Core Tools — no GitHub Actions needed.
+**Push to `main` and the `main_anton-tts.yml` GitHub Actions workflow deploys
+automatically.** It builds on `windows-latest`, so `npm install` fetches the
+correct Windows `ffmpeg.exe` via `ffmpeg-static` — no `fetch-ffmpeg` step needed
+on this path.
+
+#### Manual fallback (Azure Cloud Shell)
+
+If Actions is unavailable, deploy by hand with the Azure Functions Core Tools.
 From [Azure Cloud Shell](https://shell.azure.com) (already authenticated):
 
 ```bash
-git clone https://github.com/antontru/local-russian-tts.git
-cd local-russian-tts
+git clone https://github.com/antontru/russian-stt-telegram-mai-1.5.git
+cd russian-stt-telegram-mai-1.5
 npm ci --omit=dev
 npm run fetch-ffmpeg        # downloads a Windows ffmpeg.exe into ./bin
 func azure functionapp publish anton-tts --javascript
@@ -123,9 +170,8 @@ func azure functionapp publish anton-tts --javascript
 - App-setting changes (keys, endpoint, keyterms) take effect without a redeploy;
   code/keyterms changes require re-running `func ... publish`.
 
-> A `main_anton-tts.yml` GitHub Actions workflow also exists (from Azure Deployment
-> Center) but is **not used** — GitHub Actions is blocked on this account. Ignore or
-> delete it.
+> The manual path builds on Linux, which is why `fetch-ffmpeg` is needed there but
+> not in CI.
 
 ### 3. Register the Telegram webhook
 
@@ -144,9 +190,19 @@ That's it — send the bot a voice message and it replies with the transcription
 
 ## Editing the phrase list
 
-Edit the `keyterms` array in `keyterms.json` and push to `main`; the workflow
-redeploys automatically. The first 50 entries are sent as the MAI-Transcribe
-phrase list (the model's maximum).
+Edit the `keyterms` array in `keyterms.json` and push to `main` — it ships with
+the code, so a redeploy is required; an app-setting change alone won't pick it up.
+
+Order matters: the first `AZURE_PHRASE_LIST_MAX` entries (default 50) become the
+MAI-Transcribe phrase list, and the rest are glossary-only. The file is grouped
+accordingly — Microsoft product names, then the cloud/delivery nouns that get
+transliterated into Cyrillic, then acronyms, then client names.
+
+To check whether your resource accepts more than 50:
+
+```bash
+AZURE_SPEECH_KEY=... AZURE_SPEECH_ENDPOINT=https://<resource>.cognitiveservices.azure.com npm run probe-phrase-limit
+```
 
 ## Run locally (optional)
 

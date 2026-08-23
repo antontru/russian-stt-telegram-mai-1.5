@@ -10,7 +10,8 @@
   "scripts": {
     "start": "func start",
     "set-webhook": "node scripts/set-webhook.js",
-    "fetch-ffmpeg": "node scripts/fetch-ffmpeg.mjs"
+    "fetch-ffmpeg": "node scripts/fetch-ffmpeg.mjs",
+    "probe-phrase-limit": "node scripts/probe-phrase-limit.mjs"
   },
   "dependencies": {
     "@azure/functions": "^4.7.0",

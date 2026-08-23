@@ -66,7 +66,8 @@ async function handler(request, context) {
     // MAI-Transcribe rejects WebM/M4A/MP4/etc.; transcode those to WAV first.
     const audio = await ensureSupported(downloaded);
 
-    const { text, languageCode } = await transcribe({
+    const keyterms = getKeyterms();
+    const { text, languageCode, durationMs, confidence, phraseCount } = await transcribe({
       apiKey: config.speechKey,
       endpoint: config.speechEndpoint,
       bytes: audio.bytes,
@@ -74,28 +75,44 @@ async function handler(request, context) {
       contentType: audio.contentType,
       model: config.model,
       languageCode: config.languageCode,
-      keyterms: getKeyterms(),
+      keyterms,
+      maxPhrases: config.phraseListMax,
       transcribeStyle: config.transcribeStyle,
     });
 
     const note = audio.converted ? `, transcoded ${downloaded.contentType} → wav` : '';
-    context.log(`Transcribed ${media.kind} (${audio.bytes.length} bytes${note}, lang=${languageCode ?? 'auto'}).`);
+    context.log(
+      `Transcribed ${media.kind} (${audio.bytes.length} bytes${note}` +
+      `, audio=${durationMs ?? '?'}ms, lang=${languageCode ?? 'auto'}` +
+      `, style=${config.transcribeStyle || 'readability (default)'}` +
+      `, phrases=${phraseCount}/${keyterms.length}` +
+      `, confidence=${confidence !== undefined ? confidence.toFixed(3) : 'n/a'}).`,
+    );
 
-    // Optional cleanup pass: strip fillers/disfluencies via the Foundry model.
-    // On any failure, fall back to the raw transcript so the user still gets text.
+    // Optional cleanup pass: strips fillers and restores Cyrillic-transliterated
+    // technical terms to Latin script via the Foundry model. On any failure we
+    // fall back to the raw transcript so the user still gets text — the log line
+    // below is the only signal that happened, so it always states the outcome.
     let finalText = text;
     const { endpoint: cleanupEndpoint, apiKey: cleanupKey, model: cleanupModel } = config.cleanup;
-    if (cleanupEndpoint && cleanupKey && text.trim()) {
+    if (!cleanupEndpoint || !cleanupKey) {
+      context.log('Cleanup: skipped (AZURE_FOUNDRY_ENDPOINT/KEY not set).');
+    } else if (!text.trim()) {
+      context.log('Cleanup: skipped (empty transcript).');
+    } else {
       try {
         finalText = await cleanTranscript({
           endpoint: cleanupEndpoint,
           apiKey: cleanupKey,
           model: cleanupModel,
           text,
+          keyterms,
         });
-        context.log('Transcript cleaned via Foundry post-processing.');
+        context.log(`Cleanup: ok via ${cleanupModel} (${text.length} → ${finalText.length} chars).`);
       } catch (err) {
-        context.warn(`Cleanup failed, sending raw transcript: ${err.message}`);
+        // Logged at error level: a silent fallback to the raw transcript looks
+        // identical to a working cleanup from the chat side.
+        context.error(`Cleanup: FAILED via ${cleanupModel}, sending raw transcript — ${err.message}`);
       }
     }
 

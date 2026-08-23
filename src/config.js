@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_MAX_PHRASES } from './azure-speech.js';
+
+// Only "verbatim" is a documented explicit value; the readability-optimized
+// transcript is what you get by omitting the field entirely.
+const VALID_TRANSCRIBE_STYLES = new Set(['verbatim']);
 
 /**
  * Reads required/optional configuration from environment (Azure Function App
@@ -24,13 +29,19 @@ export function getConfig() {
     // Only this Telegram user is allowed to use the bot. Everyone else is
     // silently ignored. Stored as a numeric string.
     allowedUserId: process.env.ALLOWED_USER_ID || '',
-    // Optional BCP-47 locale hint (e.g. "ru-RU", "en-US"). Leave empty to let
-    // the service auto-detect, which is best for mixed Russian/English.
+    // Optional locale hint. MAI-Transcribe's docs use bare codes ("ru", "en");
+    // BCP-47 ("ru-RU") also works. Leave empty to let the service auto-detect,
+    // which is best for mixed Russian/English.
     languageCode: process.env.LANGUAGE_CODE || '',
+    // mai-transcribe-1 was deprecated on 2026-08-20; 1.5 is the only live model.
     model: process.env.AZURE_SPEECH_MODEL || 'mai-transcribe-1.5',
     // Optional MAI-Transcribe style. Set to "verbatim" to keep fillers and
-    // disfluencies. Leave unset for the default cleaned/formatted transcript.
-    transcribeStyle: process.env.AZURE_TRANSCRIBE_STYLE || '',
+    // disfluencies. Leave unset for the default readability-optimized
+    // transcript. An unrecognized value is dropped rather than sent, so a typo
+    // or a stale setting can't silently degrade every transcript.
+    transcribeStyle: normalizeTranscribeStyle(process.env.AZURE_TRANSCRIBE_STYLE),
+    // Phrase list cap. See DEFAULT_MAX_PHRASES / npm run probe-phrase-limit.
+    phraseListMax: positiveInt(process.env.AZURE_PHRASE_LIST_MAX, DEFAULT_MAX_PHRASES),
     // Optional transcript post-processing with a chat model on Azure Foundry.
     // Cleanup runs only when both endpoint and key are set.
     cleanup: {
@@ -39,6 +50,17 @@ export function getConfig() {
       model: process.env.AZURE_FOUNDRY_MODEL || 'Phi-4',
     },
   };
+}
+
+/** Returns the style only if the service documents it; otherwise omits it. */
+function normalizeTranscribeStyle(value) {
+  const style = (value || '').trim().toLowerCase();
+  return VALID_TRANSCRIBE_STYLES.has(style) ? style : '';
+}
+
+function positiveInt(value, fallback) {
+  const n = Number.parseInt(value ?? '', 10);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
 function required(name) {
@@ -82,7 +104,9 @@ let cachedKeyterms;
 
 /**
  * Loads the static keyterm list from keyterms.json at the repo root.
- * Cached after first read. Returns at most 1000 terms.
+ * Cached after first read. The list is capped at send time (phraseListMax),
+ * so everything in the file is returned here — the tail still feeds the
+ * cleanup model's spelling glossary even when it doesn't fit the phrase list.
  */
 export function getKeyterms() {
   if (cachedKeyterms) return cachedKeyterms;
@@ -93,8 +117,7 @@ export function getKeyterms() {
     const terms = Array.isArray(parsed.keyterms) ? parsed.keyterms : [];
     cachedKeyterms = terms
       .filter((t) => typeof t === 'string' && t.trim().length > 0)
-      .map((t) => t.trim())
-      .slice(0, 1000);
+      .map((t) => t.trim());
   } catch {
     cachedKeyterms = [];
   }
