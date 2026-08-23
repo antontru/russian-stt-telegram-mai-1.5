@@ -113,6 +113,24 @@ needed. They are read from environment variables at runtime.
 > "clean" sometimes summarizes instead — is **rejected**, and the raw transcript
 > is sent instead of a silently mangled one.
 >
+> **Insertions are the dangerous failure mode.** Phi-4 will happily prepend a
+> greeting you never said, or slip in a hedge like `наверное` that changes your
+> meaning while reading as authentic. The prompt forbids this, but a small model
+> doesn't reliably comply, so two code-level guards run on every response:
+>
+> - A prepended greeting or connector (`Привет`, `И`, `So`, …) is **stripped**,
+>   but only when the source didn't start that way — deterministic, so it's
+>   repaired rather than thrown away.
+> - Any **Cyrillic** word the model added that has no near-match in the source
+>   (edit distance ≤ 3, which lets through the spelling corrections we asked for,
+>   like `запровиженить` → `запровижинить`) causes the chunk to be **rejected**.
+>   Latin-script additions are skipped — restoring those is the point of the pass.
+>
+> Known gap: a fabricated word that already appears elsewhere in the transcript
+> slips past the second guard, because it looks accounted-for. Completing an
+> abandoned false start (`Мне нужно будет список...` → `...список компонентов`)
+> is the case to watch. Only the prompt defends against that one.
+>
 > Because that fallback is invisible from the chat side, every invocation logs
 > its outcome: `Cleanup: ok via Phi-4 (1240 → 1080 chars)`, `Cleanup: skipped
 > (...)`, or `Cleanup: FAILED via Phi-4, ... — <reason>` at **error** level.

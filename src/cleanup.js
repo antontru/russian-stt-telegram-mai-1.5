@@ -35,13 +35,15 @@ Apply exactly these three edits and nothing else:
    English fillers: um, uh, like, you know, I mean, sort of.
 2. Product names, company names, and technical nouns that were transliterated into Cyrillic must be rewritten in Latin script in their dictionary base form. Examples: "Азжур"/"Ажур" -> "Azure", "Тенант" -> "tenant", "Шерпоинт" -> "SharePoint", "Дataverse" -> "Dataverse".
    Leave Russian VERBS in Cyrillic even when they derive from English (запровижинить, задеплоить, зашарить) — only fix their spelling. Leave Russian grammar untouched.
-3. Repair punctuation and sentence boundaries left broken by the removals. Replace trailing "..." from an abandoned false start with proper punctuation.
+3. Repair punctuation and sentence boundaries left broken by the removals. Where a phrase was abandoned mid-thought ("Мне нужно будет список..."), DELETE the abandoned fragment. Do NOT finish it — the speaker never finished it either.
 
-Hard constraints:
+Hard constraints — adding words is worse than leaving the text dirty:
+- NEVER add a word the speaker did not say. In particular: no greeting at the start (Привет, Здравствуйте, Hi, Hello), no connector bolted onto the first sentence (И, А, Так, So, Well), no hedges or modality the speaker did not use (наверное, кажется, возможно, probably, maybe), and no words invented to complete an unfinished phrase.
 - NEVER translate. The output language must match the input language.
 - NEVER summarize, shorten, or omit content. Output length must be close to input length.
-- NEVER add commentary, headings, greetings, or explanations.
+- NEVER add commentary, headings, or explanations.
 - Keep every fact, name, number, and non-filler word.
+- Start the output at the same word the input starts at.
 
 Output ONLY the cleaned text.`;
 
@@ -56,6 +58,12 @@ Example input:
 
 Example output:
 Мы обсуждали Power Automate и решили, что надо делать flow.
+
+Example input (an abandoned phrase is deleted, not completed; no greeting is added):
+<transcript>Мне нужно будет список... Даже не список компонентов, мне нужно будет... рассказать админам. Для этого нужны будут права... помощь глобал-админов.</transcript>
+
+Example output:
+Даже не список компонентов — мне нужно рассказать админам. Для этого нужна помощь Global Admin.
 
 Example input:
 <transcript>So, um, yeah, the Copilot Studio, uh, agent needs to, like, connect to Entra, right?</transcript>
@@ -154,7 +162,92 @@ async function cleanChunk({ endpoint, apiKey, model, systemPrompt, chunk }) {
       'the model likely summarized instead of cleaning.',
     );
   }
-  return cleaned;
+
+  // Insertions are the dangerous failure mode: a hallucinated "наверное" adds
+  // hedging the speaker never expressed, and the text reads as authentic. The
+  // prompt forbids it, but a small model doesn't reliably comply, so check.
+  const repaired = stripHallucinatedLead(cleaned, chunk);
+  const inserted = findInsertedWords(repaired, chunk);
+  if (inserted.length > 0) {
+    throw new Error(
+      `Transcript cleanup invented words the speaker did not say: ${inserted.join(', ')}.`,
+    );
+  }
+  return repaired;
+}
+
+// Openers a model bolts onto a transcript that didn't have one. Stripped only
+// when the source didn't start that way — never when the speaker really said it.
+const HALLUCINATED_LEADS = new Set([
+  'привет', 'здравствуйте', 'здравствуй', 'добрый', 'итак', 'и', 'а', 'так', 'ну',
+  'hi', 'hello', 'hey', 'so', 'well', 'ok', 'okay',
+]);
+
+/**
+ * Drops a greeting or connector the model prepended. Deterministic and
+ * unambiguous, so we repair rather than reject the whole chunk over it.
+ */
+export function stripHallucinatedLead(cleaned, source) {
+  const first = (t) => (t.match(/[\p{L}\p{N}\-]+/u) || [''])[0].toLowerCase();
+  const cleanedFirst = first(cleaned);
+  if (!cleanedFirst || cleanedFirst === first(source)) return cleaned;
+  if (!HALLUCINATED_LEADS.has(cleanedFirst)) return cleaned;
+
+  // Drop the token plus its trailing punctuation/space, then restore the case
+  // of whatever now leads the sentence.
+  const stripped = cleaned
+    .replace(/^[^\p{L}\p{N}]*[\p{L}\p{N}\-]+[\s,.!—–-]*/u, '')
+    .trimStart();
+  if (!stripped) return cleaned;
+  return stripped[0].toUpperCase() + stripped.slice(1);
+}
+
+/**
+ * Returns Cyrillic content words the model added that aren't explained by the
+ * source. Latin-script words are skipped — restoring them to Latin is the whole
+ * point of the pass. A word with a near-match in the source is skipped too,
+ * since that's a spelling correction we asked for ("запровиженить" ->
+ * "запровижинить"), not an invention. Short function words are skipped because
+ * their counts shift with ordinary punctuation repair.
+ */
+export function findInsertedWords(cleaned, source) {
+  const tokens = (t) => (t.toLowerCase().match(/[\p{L}\p{N}\-]+/gu) || []);
+  const sourceWords = tokens(source);
+  const counts = new Map();
+  for (const w of sourceWords) counts.set(w, (counts.get(w) || 0) + 1);
+
+  const seen = new Map();
+  const inserted = [];
+  for (const w of tokens(cleaned)) {
+    seen.set(w, (seen.get(w) || 0) + 1);
+    if (seen.get(w) <= (counts.get(w) || 0)) continue;   // accounted for
+    if (w.length < 4) continue;                          // function word noise
+    if (!/\p{Script=Cyrillic}/u.test(w)) continue;        // Latin = intended
+    if (sourceWords.some((sw) => withinEditDistance(w, sw, 3))) continue;
+    if (!inserted.includes(w)) inserted.push(w);
+  }
+  return inserted;
+}
+
+/** Levenshtein distance, short-circuited once it exceeds `max`. */
+function withinEditDistance(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return false;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(
+        prev[j] + 1,
+        row[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+      best = Math.min(best, row[j]);
+    }
+    if (best > max) return false;
+    prev = row;
+  }
+  return prev[b.length] <= max;
 }
 
 /**
