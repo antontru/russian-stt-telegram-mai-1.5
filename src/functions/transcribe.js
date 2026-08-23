@@ -89,6 +89,12 @@ async function handler(request, context) {
       `, confidence=${confidence !== undefined ? confidence.toFixed(3) : 'n/a'}).`,
     );
 
+    if (config.logRawTranscript) {
+      // Opt-in: lets you tell "the recognizer misheard it" apart from "the
+      // cleanup model rewrote it wrong" by diffing against the reply.
+      context.log(`Raw transcript: ${text}`);
+    }
+
     // Optional cleanup pass: strips fillers and restores Cyrillic-transliterated
     // technical terms to Latin script via the Foundry model. On any failure we
     // fall back to the raw transcript so the user still gets text — the log line

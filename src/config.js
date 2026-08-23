@@ -42,6 +42,11 @@ export function getConfig() {
     transcribeStyle: normalizeTranscribeStyle(process.env.AZURE_TRANSCRIBE_STYLE),
     // Phrase list cap. See DEFAULT_MAX_PHRASES / npm run probe-phrase-limit.
     phraseListMax: positiveInt(process.env.AZURE_PHRASE_LIST_MAX, DEFAULT_MAX_PHRASES),
+    // Diagnostic: log the raw pre-cleanup transcript so a bad word can be
+    // attributed to the recognizer vs. the cleanup model. Off by default —
+    // it writes transcript text into Application Insights, which is the one
+    // place this otherwise zero-retention pipeline would persist your speech.
+    logRawTranscript: /^(1|true|yes)$/i.test(process.env.LOG_RAW_TRANSCRIPT || ''),
     // Optional transcript post-processing with a chat model on Azure Foundry.
     // Cleanup runs only when both endpoint and key are set.
     cleanup: {

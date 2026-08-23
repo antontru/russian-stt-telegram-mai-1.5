@@ -49,6 +49,7 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 | `AZURE_SPEECH_MODEL` | optional | Defaults to `mai-transcribe-1.5`, the only live model (`mai-transcribe-1` was deprecated 2026-08-20). |
 | `AZURE_TRANSCRIBE_STYLE` | optional | Set to `verbatim` to keep fillers/disfluencies. **Leave empty** for the default readability-optimized transcript. Any other value is ignored rather than sent, so a typo can't silently degrade every transcript. |
 | `AZURE_PHRASE_LIST_MAX` | optional | Phrase-list size sent to MAI-Transcribe. Defaults to `50`; run `npm run probe-phrase-limit` to find your resource's real ceiling. |
+| `LOG_RAW_TRANSCRIPT` | optional | Set to `1` to log the raw pre-cleanup transcript, so a bad word can be blamed on the recognizer vs. the cleanup model. **Off by default — it writes your speech into Application Insights**, the one place this otherwise zero-retention pipeline would persist it. Turn it off again once you've diagnosed the issue. |
 | `FFMPEG_PATH` | optional | Explicit path to an ffmpeg binary. Resolution order: `FFMPEG_PATH` → bundled `./bin/ffmpeg(.exe)` → `ffmpeg-static` → `ffmpeg` on PATH. |
 | `AZURE_FOUNDRY_ENDPOINT` | optional | Azure Foundry resource base, e.g. `https://<your-foundry-resource>.openai.azure.com`. Enables transcript cleanup (with `AZURE_FOUNDRY_KEY`). |
 | `AZURE_FOUNDRY_KEY` | optional | API key for the Foundry resource (sent as a Bearer token). |

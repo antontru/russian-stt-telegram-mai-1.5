@@ -12,6 +12,7 @@
     "AZURE_SPEECH_MODEL": "mai-transcribe-1.5",
     "AZURE_TRANSCRIBE_STYLE": "",
     "AZURE_PHRASE_LIST_MAX": "",
+    "LOG_RAW_TRANSCRIPT": "",
     "AZURE_FOUNDRY_ENDPOINT": "https://<your-foundry-resource>.openai.azure.com",
     "AZURE_FOUNDRY_KEY": "your-azure-foundry-key",
     "AZURE_FOUNDRY_MODEL": "Phi-4"
