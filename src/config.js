@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { DEFAULT_MAX_PHRASES } from './azure-speech.js';
 
 // "clean" (readability, the default here) or "verbatim" (keep fillers). The
@@ -109,26 +107,24 @@ function stripTrailingSlash(s) {
   return s.replace(/\/+$/, '');
 }
 
-let cachedKeyterms;
-
 /**
- * Loads the static keyterm list from keyterms.json at the repo root.
- * Cached after first read. The list is capped at send time (phraseListMax),
- * so everything in the file is returned here — the tail still feeds the
- * cleanup model's spelling glossary even when it doesn't fit the phrase list.
+ * Reads the keyterm list from the KEYTERMS app setting: a comma- (or
+ * newline-) separated list, order significant. It lives in app settings rather
+ * than the repo because it names clients and projects. The list is capped at
+ * send time (phraseListMax), so everything is returned here — the tail still
+ * feeds the cleanup model's spelling glossary even when it doesn't fit the
+ * phrase list. Whitespace is trimmed, empties dropped, duplicates removed
+ * (first occurrence wins, so ordering stays meaningful).
  */
 export function getKeyterms() {
-  if (cachedKeyterms) return cachedKeyterms;
-
-  try {
-    const path = fileURLToPath(new URL('../keyterms.json', import.meta.url));
-    const parsed = JSON.parse(readFileSync(path, 'utf8'));
-    const terms = Array.isArray(parsed.keyterms) ? parsed.keyterms : [];
-    cachedKeyterms = terms
-      .filter((t) => typeof t === 'string' && t.trim().length > 0)
-      .map((t) => t.trim());
-  } catch {
-    cachedKeyterms = [];
+  const raw = process.env.KEYTERMS || '';
+  const seen = new Set();
+  const terms = [];
+  for (const part of raw.split(/[,\n]/)) {
+    const term = part.trim();
+    if (!term || seen.has(term)) continue;
+    seen.add(term);
+    terms.push(term);
   }
-  return cachedKeyterms;
+  return terms;
 }

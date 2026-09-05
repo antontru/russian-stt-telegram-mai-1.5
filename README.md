@@ -31,7 +31,7 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 - **Function code:** `src/functions/transcribe.js` (route: `POST /api/telegram`)
 - **Telegram/Azure Speech helpers:** `src/telegram.js`, `src/azure-speech.js`
 - **Transcoding:** `src/audio.js` (ffmpeg via `ffmpeg-static`)
-- **Phrase list (key terms):** `keyterms.json` (static list, edit + redeploy to change)
+- **Phrase list (key terms):** the `KEYTERMS` app setting (comma-separated, order matters; change it in the portal, no redeploy)
 - **Supported formats:** WAV, MP3, FLAC, and OGG/Opus (Telegram voice) go straight to
   Azure; everything else (WebM, M4A/Apple Voice Memos, MP4 video notes, AMR, AAC, …)
   is transcoded to 16 kHz mono WAV first, since MAI-Transcribe only accepts
@@ -50,6 +50,7 @@ Telegram voice/video/audio  →  HTTP-triggered Azure Function (webhook)
 | `LANGUAGE_CODE` | optional | Locale hint. MAI-Transcribe's docs use bare codes (`ru`, `en`); BCP-47 (`ru-RU`) also works. **Leave empty for auto-detect — best for mixed RU/EN.** |
 | `AZURE_SPEECH_MODEL` | optional | Defaults to `MAI-Transcribe-2` (released 2026-09-03). Set to `mai-transcribe-1.5` to fall back to the previous model, which is still live; `mai-transcribe-1` was deprecated 2026-08-20. |
 | `AZURE_TRANSCRIBE_STYLE` | optional | Set to `verbatim` to keep fillers/disfluencies. **Leave empty** (or `clean`) for the readability-optimized transcript. Any other value is ignored rather than sent, so a typo can't silently degrade every transcript. The code maps this onto whichever request field the selected model expects (see the phrase-list/style note below). |
+| `KEYTERMS` | recommended | Comma-separated list of names, products, and acronyms to bias recognition toward and to spell canonically in cleanup. **Order matters** — see the phrase-list note below. Kept out of the repo because it names clients. |
 | `AZURE_PHRASE_LIST_MAX` | optional | Phrase-list size sent to MAI-Transcribe. Defaults to `50`, which is MAI-Transcribe-2's hard cap; `mai-transcribe-1.5` accepts `200`. Run `npm run probe-phrase-limit` to check your resource. |
 | `LOG_RAW_TRANSCRIPT` | optional | Set to `1` to log the raw pre-cleanup transcript, so a bad word can be blamed on the recognizer vs. the cleanup model. **Off by default — it writes your speech into Application Insights**, the one place this otherwise zero-retention pipeline would persist it. Turn it off again once you've diagnosed the issue. |
 | `FFMPEG_PATH` | optional | Explicit path to an ffmpeg binary. Resolution order: `FFMPEG_PATH` → bundled `./bin/ffmpeg(.exe)` → `ffmpeg-static` → `ffmpeg` on PATH. |
@@ -77,13 +78,15 @@ needed. They are read from environment variables at runtime.
 > `HTTP 400 "Enhanced mode with model is currently not supported yet."`
 > ([region list](https://learn.microsoft.com/azure/ai-services/speech-service/regions?tabs=llmspeech)).
 
-> **Note on the phrase list:** `keyterms.json` does double duty. Its first
+> **Note on the phrase list:** the `KEYTERMS` setting does double duty. Its first
 > `AZURE_PHRASE_LIST_MAX` entries (default **50**) are sent as the MAI-Transcribe
 > [phrase list](https://learn.microsoft.com/azure/ai-services/speech-service/mai-transcribe)
-> (only MAI-Transcribe models support this); the **whole** file is handed to the
+> (only MAI-Transcribe models support this); the **whole** list is handed to the
 > cleanup model as a spelling glossary, so terms past the cap still get their
 > canonical Latin-script form enforced. Put the terms the recognizer actually
-> gets wrong at the top.
+> gets wrong at the top: product names, client names, and acronyms. Generic
+> nouns the recognizer already handles (subscription, deployment, pipeline)
+> belong past the cap — they only need the glossary.
 >
 > The 50 cap is real for MAI-Transcribe-2: it returns `HTTP 400 "Context list
 > cannot have more than 50 items."` above that (probed 2026-09-05, North
@@ -208,8 +211,8 @@ func azure functionapp publish anton-tts --javascript
   Shell). Re-run it only when you want to refresh ffmpeg.
 - `--javascript` is needed in a fresh clone (the runtime hint lives in the
   gitignored `local.settings.json`).
-- App-setting changes (keys, endpoint, keyterms) take effect without a redeploy;
-  code/keyterms changes require re-running `func ... publish`.
+- App-setting changes (keys, endpoint, `KEYTERMS`) take effect without a
+  redeploy; code changes require re-running `func ... publish`.
 
 > The manual path builds on Linux, which is why `fetch-ffmpeg` is needed there but
 > not in CI.
@@ -231,8 +234,21 @@ That's it — send the bot a voice message and it replies with the transcription
 
 ## Editing the phrase list
 
-Edit the `keyterms` array in `keyterms.json` and push to `main` — it ships with
-the code, so a redeploy is required; an app-setting change alone won't pick it up.
+Edit the `KEYTERMS` app setting (Function App → *Settings → Environment
+variables*), or from the CLI:
+
+```bash
+az functionapp config appsettings set -n <app> -g <resource-group> --settings "KEYTERMS=Azure,Microsoft,M365 Copilot,tenant,Global Admin,LLM,RAG,SLA"
+```
+
+The change is picked up on the next invocation — no redeploy. Commas separate
+terms, so a term can't contain one; whitespace around terms is trimmed and
+duplicates are dropped (first occurrence wins). To see the current list with
+the phrase-list cutoff marked:
+
+```bash
+az functionapp config appsettings list -n <app> -g <resource-group> --query "[?name=='KEYTERMS'].value" -o tsv | tr ',' '\n' | nl | sed '50a ---- phrase-list cutoff ----'
+```
 
 Order matters: the first `AZURE_PHRASE_LIST_MAX` entries (default 50) become the
 MAI-Transcribe phrase list, and the rest are glossary-only. The file is grouped

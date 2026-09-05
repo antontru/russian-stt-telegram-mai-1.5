@@ -12,6 +12,7 @@
     "AZURE_SPEECH_MODEL": "MAI-Transcribe-2",
     "AZURE_TRANSCRIBE_STYLE": "",
     "AZURE_PHRASE_LIST_MAX": "",
+    "KEYTERMS": "Azure,Microsoft,M365 Copilot,Copilot Studio,Power Platform,Dataverse,SharePoint,Entra,tenant,Global Admin,LLM,RAG,API,SDK,POC,MVP,SLA,RBAC",
     "LOG_RAW_TRANSCRIPT": "",
     "AZURE_FOUNDRY_ENDPOINT": "https://<your-foundry-resource>.openai.azure.com",
     "AZURE_FOUNDRY_KEY": "your-azure-foundry-key",

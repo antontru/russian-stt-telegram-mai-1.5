@@ -67,6 +67,11 @@ async function handler(request, context) {
     const audio = await ensureSupported(downloaded);
 
     const keyterms = getKeyterms();
+    if (keyterms.length === 0) {
+      // Not fatal — transcription works without biasing — but worth a warning
+      // since it almost certainly means the KEYTERMS app setting is missing.
+      context.warn('KEYTERMS app setting is empty; no phrase list or glossary will be used.');
+    }
     const {
       text, languageCode, durationMs, confidence, phraseCount, transcribeStyle,
     } = await transcribe({
