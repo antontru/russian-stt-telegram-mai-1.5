@@ -67,7 +67,9 @@ async function handler(request, context) {
     const audio = await ensureSupported(downloaded);
 
     const keyterms = getKeyterms();
-    const { text, languageCode, durationMs, confidence, phraseCount } = await transcribe({
+    const {
+      text, languageCode, durationMs, confidence, phraseCount, transcribeStyle,
+    } = await transcribe({
       apiKey: config.speechKey,
       endpoint: config.speechEndpoint,
       bytes: audio.bytes,
@@ -84,7 +86,7 @@ async function handler(request, context) {
     context.log(
       `Transcribed ${media.kind} (${audio.bytes.length} bytes${note}` +
       `, audio=${durationMs ?? '?'}ms, lang=${languageCode ?? 'auto'}` +
-      `, style=${config.transcribeStyle || 'readability (default)'}` +
+      `, model=${config.model}, style=${transcribeStyle}` +
       `, phrases=${phraseCount}/${keyterms.length}` +
       `, confidence=${confidence !== undefined ? confidence.toFixed(3) : 'n/a'}).`,
     );

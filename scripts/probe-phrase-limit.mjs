@@ -2,17 +2,18 @@
 // Finds the real MAI-Transcribe phrase-list ("context list") ceiling for your
 // Speech resource.
 //
-// We cap the list at 50 because mai-transcribe-1 returned
+// The ceiling depends on the model: MAI-Transcribe-2 returns
 //   HTTP 400 "Context list cannot have more than 50 items."
-// but Microsoft's Foundry notebook for mai-transcribe-1.5 documents up to 200.
-// Rather than guess, ask the service: this sends a one-second silent WAV with
-// progressively larger phrase lists and reports which sizes are accepted.
+// while mai-transcribe-1.5 accepts up to 200 (both probed 2026-09-05, North
+// Europe). Rather than guess, ask the service: this sends a one-second silent
+// WAV with progressively larger phrase lists and reports which sizes are
+// accepted.
 //
 // Usage:
 //   AZURE_SPEECH_KEY=... AZURE_SPEECH_ENDPOINT=https://<res>.cognitiveservices.azure.com \
 //     node scripts/probe-phrase-limit.mjs
 //
-// Optional: AZURE_SPEECH_MODEL (default mai-transcribe-1.5).
+// Optional: AZURE_SPEECH_MODEL (default MAI-Transcribe-2).
 // A silent clip transcribes to nothing, which is fine — we only care whether
 // the request is accepted or rejected on the phrase-list count.
 
@@ -21,7 +22,7 @@ const SIZES = [50, 100, 128, 200, 256, 500, 1000];
 
 const key = process.env.AZURE_SPEECH_KEY;
 const endpointRaw = process.env.AZURE_SPEECH_ENDPOINT || process.env.AZURE_SPEECH_RESOURCE;
-const model = process.env.AZURE_SPEECH_MODEL || 'mai-transcribe-1.5';
+const model = process.env.AZURE_SPEECH_MODEL || 'MAI-Transcribe-2';
 
 if (!key || !endpointRaw) {
   console.error('Set AZURE_SPEECH_KEY and AZURE_SPEECH_ENDPOINT (or AZURE_SPEECH_RESOURCE).');

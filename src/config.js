@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_MAX_PHRASES } from './azure-speech.js';
 
-// Only "verbatim" is a documented explicit value; the readability-optimized
-// transcript is what you get by omitting the field entirely.
-const VALID_TRANSCRIBE_STYLES = new Set(['verbatim']);
+// "clean" (readability, the default here) or "verbatim" (keep fillers). The
+// wire format differs per model — azure-speech.js translates the intent.
+const VALID_TRANSCRIBE_STYLES = new Set(['verbatim', 'clean']);
 
 /**
  * Reads required/optional configuration from environment (Azure Function App
@@ -33,10 +33,14 @@ export function getConfig() {
     // BCP-47 ("ru-RU") also works. Leave empty to let the service auto-detect,
     // which is best for mixed Russian/English.
     languageCode: process.env.LANGUAGE_CODE || '',
-    // mai-transcribe-1 was deprecated on 2026-08-20; 1.5 is the only live model.
-    model: process.env.AZURE_SPEECH_MODEL || 'mai-transcribe-1.5',
+    // MAI-Transcribe-2 (released 2026-09-03): more accurate, faster, and
+    // cheaper ($0.10/audio-hour promo through 2026-12-31). Set
+    // AZURE_SPEECH_MODEL=mai-transcribe-1.5 to fall back — 1.5 is still live
+    // and takes a 200-item phrase list where 2 caps at 50. mai-transcribe-1
+    // was deprecated on 2026-08-20.
+    model: process.env.AZURE_SPEECH_MODEL || 'MAI-Transcribe-2',
     // Optional MAI-Transcribe style. Set to "verbatim" to keep fillers and
-    // disfluencies. Leave unset for the default readability-optimized
+    // disfluencies. Leave unset (or "clean") for the readability-optimized
     // transcript. An unrecognized value is dropped rather than sent, so a typo
     // or a stale setting can't silently degrade every transcript.
     transcribeStyle: normalizeTranscribeStyle(process.env.AZURE_TRANSCRIBE_STYLE),
